@@ -128,6 +128,9 @@
 
 pub mod types;
 
+#[cfg(feature = "shader-edsl")]
+pub mod edsl;
+
 use crate::{
   backend::shader::{Shader, ShaderData as ShaderDataBackend, Uniformable},
   context::GraphicsContext,
