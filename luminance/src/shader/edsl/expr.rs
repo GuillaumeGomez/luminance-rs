@@ -4,9 +4,10 @@ use std::{marker::PhantomData, ops};
 
 use crate::shader::{
   edsl::{
+    builtins::BuiltIn,
     fun::ErasedFunHandle,
     scope::ScopedHandle,
-    swizzle::Swizzle,
+    swizzle::{HasW, HasX, HasY, HasZ, Swizzlable, Swizzle, SwizzleSelector},
     types::{ToType, Type},
   },
   types::{Mat22, Mat33, Mat44, Vec2, Vec3, Vec4},
@@ -130,7 +131,7 @@ pub struct Expr<T>
 where
   T: ?Sized,
 {
-  erased: ErasedExpr,
+  pub erased: ErasedExpr,
   _phantom: PhantomData<T>,
 }
 
@@ -157,11 +158,41 @@ where
   T: ?Sized,
 {
   /// Type an [`ErasedExpr`] and return it wrapped in [`Expr<T>`].
-  const fn new(erased: ErasedExpr) -> Self {
+  pub(crate) const fn new(erased: ErasedExpr) -> Self {
     Self {
       erased,
       _phantom: PhantomData,
     }
+  }
+
+  /// Create an [`Expr`] representing a function argument.
+  pub(crate) fn fun_arg(handle: u16) -> Self {
+    Self::new(ErasedExpr::Var(ScopedHandle::FunArg(handle)))
+  }
+
+  /// Built an [`Expr`] representing a built-in value.
+  pub(crate) fn builtin(b: BuiltIn) -> Self {
+    Self::new(ErasedExpr::Var(ScopedHandle::BuiltIn(b)))
+  }
+
+  /// Create an expression representing a field of the current expression.
+  pub(crate) fn field<Q>(&self, f: Expr<Q>) -> Expr<Q>
+  where
+    Q: ?Sized,
+  {
+    let erased = ErasedExpr::Field {
+      object: Box::new(self.erased.clone()),
+      field: Box::new(f.erased),
+    };
+
+    Expr::new(erased)
+  }
+
+  /// Turn an expression into a [`Var`].
+  ///
+  /// This is only supposed to be used for very specific cases, such as built-in expressions / variables.
+  pub(crate) fn to_var(self) -> Var<T> {
+    Var(self)
   }
 
   /// Equality expression.
@@ -1414,7 +1445,7 @@ where
   T: ?Sized,
 {
   /// Create a new [`Var<T>`] from a [`ScopedHandle`].
-  const fn new(handle: ScopedHandle) -> Self {
+  pub(crate) const fn new(handle: ScopedHandle) -> Self {
     Self(Expr::new(ErasedExpr::Var(handle)))
   }
 
@@ -1481,4 +1512,205 @@ impl From<Mat44<f32>> for Expr<Mat44<f32>> {
   fn from(matrix: Mat44<f32>) -> Self {
     Self::new(ErasedExpr::LitM44(matrix))
   }
+}
+
+// swizzles
+
+// 2D
+impl<T> Swizzlable<SwizzleSelector> for Expr<Vec2<T>> {
+  type Output = Expr<T>;
+
+  fn swizzle(&self, x: SwizzleSelector) -> Self::Output {
+    Expr::new(ErasedExpr::Swizzle(
+      Box::new(self.erased.clone()),
+      Swizzle::D1(x),
+    ))
+  }
+}
+
+impl<T> Swizzlable<[SwizzleSelector; 2]> for Expr<Vec2<T>> {
+  type Output = Self;
+
+  fn swizzle(&self, [x, y]: [SwizzleSelector; 2]) -> Self::Output {
+    Expr::new(ErasedExpr::Swizzle(
+      Box::new(self.erased.clone()),
+      Swizzle::D2(x, y),
+    ))
+  }
+}
+
+// 3D
+impl<T> Swizzlable<SwizzleSelector> for Expr<Vec3<T>> {
+  type Output = Expr<T>;
+
+  fn swizzle(&self, x: SwizzleSelector) -> Self::Output {
+    Expr::new(ErasedExpr::Swizzle(
+      Box::new(self.erased.clone()),
+      Swizzle::D1(x),
+    ))
+  }
+}
+
+impl<T> Swizzlable<[SwizzleSelector; 2]> for Expr<Vec3<T>> {
+  type Output = Expr<Vec2<T>>;
+
+  fn swizzle(&self, [x, y]: [SwizzleSelector; 2]) -> Self::Output {
+    Expr::new(ErasedExpr::Swizzle(
+      Box::new(self.erased.clone()),
+      Swizzle::D2(x, y),
+    ))
+  }
+}
+
+impl<T> Swizzlable<[SwizzleSelector; 3]> for Expr<Vec3<T>> {
+  type Output = Self;
+
+  fn swizzle(&self, [x, y, z]: [SwizzleSelector; 3]) -> Self::Output {
+    Expr::new(ErasedExpr::Swizzle(
+      Box::new(self.erased.clone()),
+      Swizzle::D3(x, y, z),
+    ))
+  }
+}
+
+// 4D
+impl<T> Swizzlable<SwizzleSelector> for Expr<Vec4<T>> {
+  type Output = Expr<T>;
+
+  fn swizzle(&self, x: SwizzleSelector) -> Self::Output {
+    Expr::new(ErasedExpr::Swizzle(
+      Box::new(self.erased.clone()),
+      Swizzle::D1(x),
+    ))
+  }
+}
+
+impl<T> Swizzlable<[SwizzleSelector; 2]> for Expr<Vec4<T>> {
+  type Output = Expr<Vec2<T>>;
+
+  fn swizzle(&self, [x, y]: [SwizzleSelector; 2]) -> Self::Output {
+    Expr::new(ErasedExpr::Swizzle(
+      Box::new(self.erased.clone()),
+      Swizzle::D2(x, y),
+    ))
+  }
+}
+
+impl<T> Swizzlable<[SwizzleSelector; 3]> for Expr<Vec4<T>> {
+  type Output = Expr<Vec3<T>>;
+
+  fn swizzle(&self, [x, y, z]: [SwizzleSelector; 3]) -> Self::Output {
+    Expr::new(ErasedExpr::Swizzle(
+      Box::new(self.erased.clone()),
+      Swizzle::D3(x, y, z),
+    ))
+  }
+}
+
+impl<T> Swizzlable<[SwizzleSelector; 4]> for Expr<Vec4<T>> {
+  type Output = Self;
+
+  fn swizzle(&self, [x, y, z, w]: [SwizzleSelector; 4]) -> Self::Output {
+    Expr::new(ErasedExpr::Swizzle(
+      Box::new(self.erased.clone()),
+      Swizzle::D4(x, y, z, w),
+    ))
+  }
+}
+
+macro_rules! impl_has_k {
+  ($trait:ident, $name:ident, $selector:ident, $t:ident) => {
+    impl<T> $trait for Expr<$t<T>> {
+      type Output = Expr<T>;
+
+      fn $name(&self) -> Self::Output {
+        self.swizzle(SwizzleSelector::$selector)
+      }
+    }
+  };
+}
+
+impl_has_k!(HasX, x, X, Vec2);
+impl_has_k!(HasX, x, X, Vec3);
+impl_has_k!(HasX, x, X, Vec4);
+
+impl_has_k!(HasY, y, Y, Vec2);
+impl_has_k!(HasY, y, Y, Vec3);
+impl_has_k!(HasY, y, Y, Vec4);
+
+impl_has_k!(HasZ, z, Z, Vec3);
+impl_has_k!(HasZ, z, Z, Vec4);
+
+impl_has_k!(HasW, w, W, Vec4);
+
+/// Swizzle macro.
+///
+/// This macro allows to swizzle expressions to yield expressions reorganizing the vector attributes. For instance,
+/// `sw!(color, .rgbr)` will take a 4D color and will output a 4D color for which the alpha channel is overridden with
+/// the red channel.
+///
+/// The current syntax allows to extract and construct from a lot of types. Have a look at [`Swizzlable`] for a
+/// comprehensive list of what you can do.
+#[macro_export]
+macro_rules! sw {
+  ($e:expr, . $a:tt) => {
+    $e.swizzle($crate::sw_extract!($a))
+  };
+
+  ($e:expr, . $a:tt $b:tt) => {
+    $e.swizzle([$crate::sw_extract!($a), $crate::sw_extract!($b)])
+  };
+
+  ($e:expr, . $a:tt $b:tt $c:tt) => {
+    $e.swizzle([
+      $crate::sw_extract!($a),
+      $crate::sw_extract!($b),
+      $crate::sw_extract!($c),
+    ])
+  };
+
+  ($e:expr, . $a:tt $b:tt $c:tt $d:tt) => {
+    $e.swizzle([
+      $crate::sw_extract!($a),
+      $crate::sw_extract!($b),
+      $crate::sw_extract!($c),
+      $crate::sw_extract!($d),
+    ])
+  };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! sw_extract {
+  (x) => {
+    $crate::SwizzleSelector::X
+  };
+
+  (r) => {
+    $crate::SwizzleSelector::X
+  };
+
+  (y) => {
+    $crate::SwizzleSelector::Y
+  };
+
+  (g) => {
+    $crate::SwizzleSelector::Y
+  };
+
+  (z) => {
+    $crate::SwizzleSelector::Z
+  };
+
+  (b) => {
+    $crate::SwizzleSelector::Z
+  };
+
+  (w) => {
+    $crate::SwizzleSelector::W
+  };
+
+  (a) => {
+    $crate::SwizzleSelector::W
+  };
 }

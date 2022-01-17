@@ -53,3 +53,51 @@ pub trait Swizzlable<S> {
 
   fn swizzle(&self, sw: S) -> Self::Output;
 }
+
+/// Expressions having a `x` or `r` coordinate.
+///
+/// Akin to swizzling with `.x` or `.r`, but easier.
+pub trait HasX {
+  type Output;
+
+  fn x(&self) -> Self::Output;
+  fn r(&self) -> Self::Output {
+    self.x()
+  }
+}
+
+/// Expressions having a `y` or `g` coordinate.
+///
+/// Akin to swizzling with `.y` or `.g`, but easier.
+pub trait HasY {
+  type Output;
+
+  fn y(&self) -> Self::Output;
+  fn g(&self) -> Self::Output {
+    self.y()
+  }
+}
+
+/// Expressions having a `z` or `b` coordinate.
+///
+/// Akin to swizzling with `.z` or `.b`, but easier.
+pub trait HasZ {
+  type Output;
+
+  fn z(&self) -> Self::Output;
+  fn b(&self) -> Self::Output {
+    self.z()
+  }
+}
+
+/// Expressions having a `w` or `a` coordinate.
+///
+/// Akin to swizzling with `.w` or `.a`, but easier.
+pub trait HasW {
+  type Output;
+
+  fn w(&self) -> Self::Output;
+  fn a(&self) -> Self::Output {
+    self.w()
+  }
+}

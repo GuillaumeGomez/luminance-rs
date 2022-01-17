@@ -20,6 +20,7 @@ maintenance = { status = "actively-developed" }
 default = ["derive", "shader-edsl"]
 derive = ["luminance-derive"]
 shader-edsl = []
+shader-edsl-fun-call = [] # nightly only
 
 [dependencies.luminance-derive]
 version = "0.9.0"

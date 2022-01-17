@@ -321,6 +321,11 @@
   html_logo_url = "https://github.com/phaazon/luminance-rs/blob/master/docs/imgs/luminance_alt.svg"
 )]
 #![deny(missing_docs)]
+#![cfg_attr(
+  all(feature = "shader-edsl", feature = "shader-edsl-fun-call"),
+  feature(unboxed_closures),
+  feature(fn_traits)
+)]
 
 #[cfg(feature = "derive")]
 pub use luminance_derive::*;
